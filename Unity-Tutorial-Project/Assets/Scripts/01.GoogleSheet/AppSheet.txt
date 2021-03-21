@@ -1,0 +1,157 @@
+
+var sheetId = SpreadsheetApp.openById("1rAwkICocl8blZJTw9S0Dd8R0ZiRaIv6kjPycbVa4CjE");
+var sheet = sheetId.getSheets()[0];
+var logSheet = sheetId.getSheets()[1];
+var cache = CacheService.getUserCache();
+var p;
+var result, msg, value;
+
+
+
+
+
+
+function removeCache()
+{
+  cache.removeAll(["id", "row"]);
+}
+
+
+function response()
+{
+  var json = {};
+  json.order = p.order;
+  json.result = result;
+  json.msg = msg;
+  json.value = value;
+  
+  jsonData = JSON.stringify(json);
+  logSheet.appendRow([cache.get("id") + ", " + jsonData.toString() + ", " + new Date().toString()]);
+  return ContentService.createTextOutput(jsonData);
+}
+
+
+// 인젝션 방지
+function regCheck(val)
+{
+  var regExp = /[\{\}\[\]\/?.,;"|\)*~`!^\-+<>@\#$%&\\\=\(\'\"]/gi;
+
+  if(regExp.test(val)) return false;
+  else return true;
+}
+
+
+
+function doPost(e) 
+{
+  p = e.parameter;
+  
+  if(!regCheck(p.order) || !regCheck(p.id)  || !regCheck(p.pass)  || !regCheck(p.value))
+    return ContentService.createTextOutput("");
+  
+  
+  
+  switch(p.order)
+  {
+    case "register": removeCache(); register(); break;
+    case "login": removeCache(); login(); break;
+    case "logout": removeCache(); break;
+    case "setValue": setValue(); break;
+    case "getValue": getValue(); break;
+  }
+  
+
+  return response();
+}
+
+
+
+
+
+
+
+function setResult(_result, _msg)
+{
+  result = _result;
+  msg = _msg;
+}
+
+
+function register()
+{       
+  
+  var cell = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  if(cell.some(row => row == p.id)) 
+  {
+    setResult("ERROR", "이미 존재하는 닉네임입니다");
+    return;
+  }
+
+  sheet.appendRow([p.id, p.pass]);
+  setResult("OK", "회원가입 완료");
+}
+
+
+
+
+
+function getProfile()
+{
+  var cell = sheet.getRange(2, 1, sheet.getLastRow() - 1 , 2).getValues();
+
+  for(i = 0; i < cell.length; i++)
+  {
+    if(cell[i][0] != p.id || cell[i][1] != p.pass) 
+      continue;
+
+    cache.put("id", cell[i][0]);
+    cache.put("row", (i + 2).toString());
+    return true;
+  }
+  return false;
+}
+
+
+function login()
+{
+  if(!getProfile()) 
+  {
+    setResult("ERROR", "로그인 실패");
+    return;
+  }
+
+  setResult("OK", "로그인 완료");
+}
+
+
+
+
+function setValue()
+{
+  if(cache.get("row") == null) 
+  {
+    setResult("ERROR", "다시 로그인 해주세요");
+    return;
+  }
+
+  sheet.getRange(cache.get("row"), 3).setValue(p.value);
+  setResult("OK", cache.get("id") + "님이 " + p.value + "값 저장 완료");
+}
+
+
+
+
+
+function getValue()
+{
+  if(cache.get("row") == null) 
+  {
+    setResult("ERROR", "다시 로그인 해주세요");
+    return;
+  }
+ 
+  value = sheet.getRange(cache.get("row"), 3).getValue();
+  setResult("OK", cache.get("id") + "님이 값 불러오기 완료");
+}
+
+
